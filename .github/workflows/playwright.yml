@@ -1,0 +1,51 @@
+name: Run Playwright Tests (Manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Playwright on ${{ matrix.browser }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.11.0
+          cache: npm
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install dependencies and Playwright
+        run: |
+          npm ci
+          npx playwright install --with-deps
+
+      - name: Run tests on ${{ matrix.browser }}
+        run: npx playwright test --project=${{ matrix.browser }} --reporter=html
+
+      - name: Rename report folder
+        if: ${{ always() }}
+        run: mv playwright-report "playwright-report-${{ matrix.browser }}"
+
+      - name: Upload HTML report artifact
+        uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: playwright-report-${{ matrix.browser }}
