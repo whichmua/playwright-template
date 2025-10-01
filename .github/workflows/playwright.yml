@@ -5,20 +5,17 @@ on:
 
 jobs:
   test:
-    name: Playwright on ${{ matrix.browser }}
+    name: Playwright on ${{ matrix.project }}
     runs-on: ubuntu-latest
-
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, firefox, webkit]
+        project: [chromium, firefox, webkit, api]
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22.11.0
           cache: npm
@@ -31,21 +28,23 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-playwright-
 
-      - name: Install dependencies and Playwright
-        run: |
-          npm ci
-          npx playwright install --with-deps
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Run tests on ${{ matrix.browser }}
-        run: npx playwright test --project=${{ matrix.browser }} --reporter=html
+      - name: Install Playwright browsers (UI only)
+        if: ${{ matrix.project != 'api' }}
+        run: npx playwright install --with-deps
+
+      - name: Run tests
+        run: npx playwright test --project="${{ matrix.project }}"
 
       - name: Rename report folder
         if: ${{ always() }}
-        run: mv playwright-report "playwright-report-${{ matrix.browser }}"
+        run: if [ -d playwright-report ]; then mv playwright-report "playwright-report-${{ matrix.project }}"; fi
 
       - name: Upload HTML report artifact
         uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
-          name: playwright-report-${{ matrix.browser }}
-          path: playwright-report-${{ matrix.browser }}
+          name: playwright-report-${{ matrix.project }}
+          path: playwright-report-${{ matrix.project }}

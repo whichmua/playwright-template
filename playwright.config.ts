@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { ApiUrls } from "./support/urls";
 
 export default defineConfig({
   testDir: "./tests",
@@ -15,17 +16,34 @@ export default defineConfig({
 
   projects: [
     {
-      name: "UI - Chromium",
+      name: "chromium",
       testMatch: /.*\.spec\.ts/,
+      testIgnore: /.*\.api\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
+      outputDir: "test-results/chromium",
+    },
+    {
+      name: "firefox",
+      testMatch: /.*\.spec\.ts/,
+      testIgnore: /.*\.api\.spec\.ts/,
+      use: { ...devices["Desktop Firefox"] },
+      outputDir: "test-results/firefox",
+    },
+    {
+      name: "webkit",
+      testMatch: /.*\.spec\.ts/,
+      testIgnore: /.*\.api\.spec\.ts/,
+      use: { ...devices["Desktop Safari"] },
+      outputDir: "test-results/webkit",
     },
 
     {
-      name: "API",
+      name: "api",
       testMatch: /.*\.api\.spec\.ts/,
       use: {
-        baseURL: "https://automationexercise.com/api",
+        baseURL: ApiUrls.baseUrl,
       },
+      outputDir: "test-results/api",
     },
   ],
 
