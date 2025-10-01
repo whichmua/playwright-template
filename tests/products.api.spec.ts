@@ -1,61 +1,89 @@
-import {
-  test,
-  expect,
-  request,
-  APIResponse,
-  APIRequestContext,
-} from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { ApiUrls } from "../support/urls";
 
-async function parseJsonOrThrow(response: APIResponse) {
-  try {
-    return await response.json();
-  } catch {
-    const text = await response.text();
-    throw new Error(`Failed to parse JSON. Raw response:\n${text}`);
-  }
-}
+type Product = {
+  id: string | number;
+  name: string;
+  price: string | number;
+};
 
-test.describe("@api Products API", () => {
-  let api: APIRequestContext;
+const isValidProduct = (p: unknown): p is Product => {
+  if (!p || typeof p !== "object") return false;
+  const o = p as Record<string, unknown>;
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(o, k);
+  return (
+    has("id") &&
+    has("name") &&
+    has("price") &&
+    (typeof o.id === "string" || typeof o.id === "number") &&
+    typeof o.name === "string" &&
+    (typeof o.price === "string" || typeof o.price === "number")
+  );
+};
 
-  test.beforeAll(async () => {
-    api = await request.newContext({ baseURL: ApiUrls.baseUrl });
-  });
+test.describe("AutomationExercise API", () => {
+  const BASE = ApiUrls.baseUrl;
 
-  test.afterAll(async () => {
-    await api.dispose();
-  });
+  test("GET /productsList → 200 & valid product structure", async ({
+    request,
+  }) => {
+    const url = `${BASE}/productsList`;
+    const response = await request.get(url);
 
-  test("Get all products list", async () => {
-    // Given I send a "GET" request to "/productsList"
-    const response = await api.get("/productsList");
+    await expect(response).toBeOK();
 
-    // Then the response status should be "200"
-    expect(
-      response.status(),
-      `Expected status 200, got ${response.status()}`,
-    ).toBe(200);
+    const raw = await response.text();
+    expect(raw.trim().startsWith("{")).toBeTruthy();
 
-    // And the response should contain a list of products
-    const body = await parseJsonOrThrow(response);
+    const body = JSON.parse(raw);
+
     expect(body).toHaveProperty("products");
     expect(Array.isArray(body.products)).toBe(true);
     expect(body.products.length).toBeGreaterThan(0);
 
-    // And each product should have "id", "name", and "price"
-    for (const [i, product] of body.products.entries()) {
-      expect(product, `Product[${i}] missing 'id'`).toHaveProperty("id");
-      expect(product, `Product[${i}] missing 'name'`).toHaveProperty("name");
-      expect(product, `Product[${i}] missing 'price'`).toHaveProperty("price");
+    for (const product of body.products) {
+      expect.soft(isValidProduct(product)).toBe(true);
+      if (isValidProduct(product)) {
+        expect(typeof product.name).toBe("string");
+      }
     }
   });
 
-  test("Requesting an invalid endpoint returns 404", async () => {
-    // When I send a "GET" request to "/invalidEndpoint"
-    const response = await api.get("/invalidEndpoint");
-
-    // Then the response status should be "404"
+  test("GET invalid endpoint → 404", async ({ request }) => {
+    const response = await request.get(`${BASE}/invalidEndpoint`);
     expect(response.status()).toBe(404);
+  });
+
+  test("POST /searchProduct → 200 & returns matching products", async ({
+    request,
+  }) => {
+    const searchTerm = "jean";
+
+    const response = await request.post(`${BASE}/searchProduct`, {
+      headers: { accept: "application/json" },
+      form: { search_product: searchTerm },
+    });
+
+    expect(response.status()).toBe(200);
+
+    const ct = response.headers()["content-type"] ?? "";
+    if (!/json/i.test(ct)) {
+      console.warn(`Non-JSON content-type received: ${ct}`);
+    }
+
+    const raw = await response.text();
+    expect(raw.trim().startsWith("{")).toBeTruthy();
+    const body = JSON.parse(raw);
+
+    expect(body).toHaveProperty("products");
+    expect(Array.isArray(body.products)).toBe(true);
+    expect(body.products.length).toBeGreaterThan(0);
+
+    for (const product of body.products) {
+      expect.soft(isValidProduct(product)).toBe(true);
+      if (isValidProduct(product)) {
+        expect(product.name.toLowerCase()).toContain(searchTerm.toLowerCase());
+      }
+    }
   });
 });
