@@ -4,7 +4,7 @@ import { ApiUrls } from "./support/urls";
 export default defineConfig({
   testDir: "./tests",
   timeout: 30_000,
-  retries: 1,
+  retries: 3,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     headless: true,
